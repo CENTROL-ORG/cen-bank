@@ -298,7 +298,7 @@
             
             .mobile-nav {
                 display: grid;
-                grid-template-columns: repeat(4, 1fr);
+                grid-template-columns: repeat(3, 1fr);
                 position: fixed;
                 bottom: 0; left: 0; right: 0;
                 background: rgba(10, 12, 26, 0.9);
@@ -340,7 +340,6 @@
             <div class="brand-title">🏛️ CEN Central Registry</div>
             <div class="nav-menu">
                 <button class="nav-btn active" onclick="switchTab('dashboard-tab', this)">📊 Metric Core</button>
-                <button class="nav-btn" onclick="switchTab('bank-tab', this)">💳 Banking Engine</button>
                 <button class="nav-btn" onclick="switchTab('loan-tab', this)">📈 Credit Matrix</button>
                 <button class="nav-btn" onclick="switchTab('ledger-tab', this)">📜 Asset Ledger</button>
             </div>
@@ -361,40 +360,17 @@
                 </div>
             </div>
 
-            <!-- TAB CONTAINER 1: GLOBAL CONTROL OVERVIEW OVERVIEW -->
+            <!-- TAB CONTAINER 1: GLOBAL CONTROL OVERVIEW -->
             <div id="dashboard-tab" class="tab-window active">
                 <div class="card">
                     <h2>CEN Administrative Core</h2>
                     <p style="color: var(--text-secondary); font-size: 14px; margin: 0 0 0 0; line-height: 1.6;">
-                        Systems are authenticated and balanced. Navigate to the specialized operational compartments below or via the main access interface columns to execute transactional modules or verify asset parameters.
+                        Systems are authenticated and balanced. Use the dynamic Credit Matrix configuration modules to request asset disbursements or query the active ledger registry to examine historical verification sequences.
                     </p>
                 </div>
             </div>
 
-            <!-- TAB CONTAINER 2: LIQUIDITY ROUTING WORKSPACE -->
-            <div id="bank-tab" class="tab-window">
-                <div class="card">
-                    <h2>Transaction Routing Processing</h2>
-                    <div class="form-group">
-                        <label>Action Allocation Vector</label>
-                        <select id="tx-type">
-                            <option value="CREDIT">DEPOSIT (Credit Account Allocation)</option>
-                            <option value="DEBIT">WITHDRAWAL / TRANSFER (Debit Account Clearance)</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Asset Volume Value (INR)</label>
-                        <input type="number" id="tx-amount" placeholder="0.00" min="0.01" step="any">
-                    </div>
-                    <div class="form-group">
-                        <label>Reference Label / Destination Target</label>
-                        <input type="text" id="tx-desc" placeholder="e.g., P2P Transfer to External Asset Wallet">
-                    </div>
-                    <button class="btn-action" onclick="executeTransaction()">AUTHORIZE TRANSACTION SEQUENCE</button>
-                </div>
-            </div>
-
-            <!-- TAB CONTAINER 3: CREDIT GENERATOR MATRIX -->
+            <!-- TAB CONTAINER 2: CREDIT GENERATOR MATRIX -->
             <div id="loan-tab" class="tab-window">
                 <div class="card">
                     <h2>Request Credit Allocation</h2>
@@ -422,7 +398,7 @@
                 </div>
             </div>
 
-            <!-- TAB CONTAINER 4: ACCOUNT RECORD CHRONICLER -->
+            <!-- TAB CONTAINER 3: ACCOUNT RECORD CHRONICLER -->
             <div id="ledger-tab" class="tab-window">
                 <div class="card">
                     <h2>System Ledger Journal Records</h2>
@@ -433,16 +409,14 @@
         </div>
     </div>
 
-    <!-- RESPONSIVE MOBILE STICKY FOOTER TOOL NAVIGATION -->
+    <!-- RESPONSIVE MOBILE STICKY FOOTER TOOL NAVIGATION (Banking Tab Terminated) -->
     <div class="mobile-nav">
         <button class="nav-btn active" onclick="switchTab('dashboard-tab', this)"><span>📊</span>Home</button>
-        <button class="nav-btn" onclick="switchTab('bank-tab', this)"><span>💳</span>Banking</button>
         <button class="nav-btn" onclick="switchTab('loan-tab', this)"><span>📈</span>Loans</button>
         <button class="nav-btn" onclick="switchTab('ledger-tab', this)"><span>📜</span>Ledgers</button>
     </div>
 
 <script>
-    // PRESERVED FIREBASE BACKEND AND CALCULATOR FORMULAS
     const firebaseConfig = { databaseURL: "https://centrol-bank-default-rtdb.asia-southeast1.firebasedatabase.app" };
     if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
@@ -498,36 +472,6 @@
 
         document.getElementById('calc-formula').innerText = `₹${totalPayable.toFixed(2)} (Interest: ₹${addedInterest.toFixed(2)})`;
         return { rate, totalPayable };
-    }
-
-    async function executeTransaction() {
-        const type = document.getElementById('tx-type').value;
-        const amount = parseFloat(document.getElementById('tx-amount').value) || 0;
-        const desc = document.getElementById('tx-desc').value || "Manual System Adjustment";
-
-        if (amount <= 0) return alert("Enter a valid amount.");
-        
-        let targetBalance = globalBalance;
-        if (type === "CREDIT") {
-            targetBalance += amount;
-        } else {
-            if (amount > globalBalance) return alert("Insufficient account reserves.");
-            targetBalance -= amount;
-        }
-
-        targetBalance = Math.round(targetBalance * 1000000) / 1000000;
-
-        const userRef = db.ref(`users/${userId}`);
-        await userRef.child('balance').set(targetBalance);
-        await userRef.child('history').push({
-            amount: type === "CREDIT" ? amount : -amount,
-            description: desc.toUpperCase(),
-            timestamp: new Date().toLocaleString(),
-            type: type
-        });
-
-        document.getElementById('tx-amount').value = "";
-        document.getElementById('tx-desc').value = "";
     }
 
     async function submitLoanApplication() {
