@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CEN Central Bank & Credit Registry</title>
+    <title>CEN Central Bank & Credit Registry (Weekly Core)</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <style>
@@ -112,8 +112,8 @@
                     <input type="number" id="loan-amount" placeholder="0.00" min="1" oninput="runLoanCalculations()">
                 </div>
                 <div class="form-group">
-                    <label>Amortization Window (Months)</label>
-                    <input type="number" id="loan-months" value="1" min="1" max="120" oninput="runLoanCalculations()">
+                    <label>Amortization Window (Weeks)</label>
+                    <input type="number" id="loan-weeks" value="1" min="1" max="520" oninput="runLoanCalculations()">
                 </div>
                 
                 <div class="calc-preview">
@@ -134,7 +134,6 @@
     </div>
 
 <script>
-    // Configured directly with your default Asia Southeast Realtime Database URL
     const firebaseConfig = { databaseURL: "https://centrol-bank-default-rtdb.asia-southeast1.firebasedatabase.app" };
     if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
@@ -143,13 +142,11 @@
     let globalBalance = 0;
     let globalCreditScore = 550;
 
-    // Synchronize global account layers instantaneously
+    // Realtime Database sync
     db.ref(`users/${userId}`).on('value', (snap) => {
         const userData = snap.val() || {};
         
         globalBalance = parseFloat(userData.balance) || 0;
-        
-        // CRITICAL FIX: Fallback to 550 if credit_score is missing in your current live database
         globalCreditScore = userData.credit_score !== undefined ? parseInt(userData.credit_score) : 550;
 
         document.getElementById('display-balance').innerText = `₹${globalBalance.toFixed(2)}`;
@@ -178,12 +175,12 @@
 
     function runLoanCalculations() {
         const principal = parseFloat(document.getElementById('loan-amount').value) || 0;
-        const months = parseInt(document.getElementById('loan-months').value) || 0;
+        const weeks = parseInt(document.getElementById('loan-weeks').value) || 0;
         
         const rate = getInterestRate(globalCreditScore);
         document.getElementById('calc-rate').innerText = `${rate}%`;
 
-        const weeks = months * 4.34524; 
+        // FIXED WEEKLY FORMULA: Final = Principal + (Principal * Rate * Weeks / 100)
         const addedInterest = (principal * rate * weeks) / 100;
         const totalPayable = principal + addedInterest;
 
@@ -194,19 +191,18 @@
     async function executeTransaction() {
         const type = document.getElementById('tx-type').value;
         const amount = parseFloat(document.getElementById('tx-amount').value) || 0;
-        const desc = document.getElementById('tx-desc').value || "Manual Transaction Engine Adjustment";
+        const desc = document.getElementById('tx-desc').value || "Manual System Adjustment";
 
-        if (amount <= 0) return alert("Enter a valid numeric configuration amount.");
+        if (amount <= 0) return alert("Enter a valid amount.");
         
         let targetBalance = globalBalance;
         if (type === "CREDIT") {
             targetBalance += amount;
         } else {
-            if (amount > globalBalance) return alert("Insufficient Liquid Reserves present inside target system layer.");
+            if (amount > globalBalance) return alert("Insufficient account reserves.");
             targetBalance -= amount;
         }
 
-        // CRITICAL FIX: Safe float rounding before pushing to DB
         targetBalance = Math.round(targetBalance * 1000000) / 1000000;
 
         const userRef = db.ref(`users/${userId}`);
@@ -224,29 +220,30 @@
 
     async function submitLoanApplication() {
         const principal = parseFloat(document.getElementById('loan-amount').value) || 0;
-        const months = parseInt(document.getElementById('loan-months').value) || 0;
+        const weeks = parseInt(document.getElementById('loan-weeks').value) || 0;
 
-        if (principal <= 0 || months <= 0) return alert("Construct a structurally sound Principal/Month payload.");
+        if (principal <= 0 || weeks <= 0) return alert("Enter a valid weekly/principal configuration.");
 
         const { rate, totalPayable } = runLoanCalculations();
-        const dueTimestamp = Date.now() + (months * 30 * 24 * 60 * 60 * 1000);
+        
+        // TIME STRUCT: 1 Week = 7 Days
+        const dueTimestamp = Date.now() + (weeks * 7 * 24 * 60 * 60 * 1000);
 
         let targetBalance = Math.round((globalBalance + principal) * 1000000) / 1000000;
         const userRef = db.ref(`users/${userId}`);
         
         await userRef.child('balance').set(targetBalance);
         
-        // This syncs smoothly with your live logs
         await userRef.child('history').push({
             amount: principal,
-            description: `LOAN DISBURSEMENT GRANTED (${rate}% INT)`,
+            description: `LOAN DISBURSEMENT GRANTED (${rate}% INT / ${weeks} WEEKS)`,
             timestamp: new Date().toLocaleString(),
             type: "CREDIT"
         });
 
         await userRef.child('loans').push({
             principal: principal,
-            months: months,
+            weeks: weeks,
             interest_rate: rate,
             final_amount: Math.round(totalPayable * 100) / 100,
             status: "ACTIVE",
@@ -255,12 +252,12 @@
         });
 
         document.getElementById('loan-amount').value = "";
-        alert("Loan Granted! Funds successfully mixed with your balance.");
+        alert("Loan Granted! Funds mixed successfully.");
     }
 
     async function processLoanRepayment(loanKey, loanData) {
         const totalOwed = loanData.final_amount;
-        if (globalBalance < totalOwed) return alert("Liquid Account Reserves insufficient to pay off total structural balance liability.");
+        if (globalBalance < totalOwed) return alert("Insufficient reserves to settle this liability.");
 
         const now = Date.now();
         const dueTime = loanData.due_timestamp;
@@ -268,16 +265,16 @@
 
         let trackingScoreModification = 0;
 
-        // Dynamic credit scoring engine logic
+        // Score engine calculation relative to target deadlines
         if (varianceMs > 86400000) { 
-            trackingScoreModification = 5; 
+            trackingScoreModification = 5; // Early bonus (+2) + Base pay (+3)
         } else if (varianceMs >= 0) {
-            trackingScoreModification = 3; 
+            trackingScoreModification = 3; // Within the 24-hour bracket up to midnight (+3)
         } else {
             const overdueHours = Math.abs(varianceMs) / 3600000;
 
             if (overdueHours <= 24) {
-                trackingScoreModification = 0; 
+                trackingScoreModification = 0; // Grace block first day
             } else if (overdueHours <= 48) {
                 trackingScoreModification = -3;
             } else {
@@ -299,12 +296,12 @@
         
         await userRef.child('history').push({
             amount: -totalOwed,
-            description: `REPAYMENT: LOAN SYSTEM AUDIT PARENT (SCORE: ${trackingScoreModification >= 0 ? '+' : ''}${trackingScoreModification})`,
+            description: `REPAYMENT: LOAN RELEASE SYSTEM (CREDIT: ${trackingScoreModification >= 0 ? '+' : ''}${trackingScoreModification})`,
             timestamp: new Date().toLocaleString(),
             type: "DEBIT"
         });
 
-        alert(`Loan Settled! Credit Score Adjusted: ${trackingScoreModification >= 0 ? '+' : ''}${trackingScoreModification} Points.`);
+        alert(`Loan Repaid! Credit score has shifted by ${trackingScoreModification >= 0 ? '+' : ''}${trackingScoreModification} points.`);
     }
 
     function renderLedgers(historyObj, loansObj) {
@@ -326,7 +323,7 @@
                 `;
             });
         } else {
-            txLog.innerHTML = `<div style="text-align:center; color:#444; font-size:12px; padding:20px;">No account data traces visible.</div>`;
+            txLog.innerHTML = `<div style="text-align:center; color:#444; font-size:12px; padding:20px;">No transaction details found.</div>`;
         }
 
         const loanLog = document.getElementById('loan-history-log');
@@ -339,12 +336,12 @@
                 loanLog.innerHTML += `
                     <div class="loan-card" style="border-color: ${!isActive ? '#222' : isOverdue ? '#ff0033' : '#00e1ff'}">
                         <div class="loan-header">
-                            <span>REGISTRY RECONCILIATION ID: ...${key.slice(-6).toUpperCase()}</span>
+                            <span>RECONCILIATION BLOCK ID: ...${key.slice(-6).toUpperCase()}</span>
                             <span class="${isActive ? (isOverdue ? 'accent-red' : 'accent-blue') : 'accent-green'}">${loan.status}</span>
                         </div>
                         <div class="loan-body">
                             <div>Principal Base: <b>₹${loan.principal.toFixed(2)}</b></div>
-                            <div>Term Matrix: <b>${loan.months} Months</b></div>
+                            <div>Term Matrix: <b>${loan.weeks || 0} Weeks</b></div>
                             <div>Tier Rate: <b>${loan.interest_rate}%</b></div>
                             <div>Liability Cap: <b class="accent-red">₹${loan.final_amount.toFixed(2)}</b></div>
                             <div style="grid-column: span 2; font-size:11px; margin-top:5px; color:#666;">
@@ -356,7 +353,7 @@
                 `;
             });
         } else {
-            loanLog.innerHTML = `<div style="text-align:center; color:#444; font-size:12px; padding:20px;">No active profiles matched inside log index.</div>`;
+            loanLog.innerHTML = `<div style="text-align:center; color:#444; font-size:12px; padding:20px;">No history logs registered.</div>`;
         }
     }
 </script>
