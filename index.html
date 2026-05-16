@@ -142,7 +142,6 @@
     let globalBalance = 0;
     let globalCreditScore = 550;
 
-    // Realtime Database sync
     db.ref(`users/${userId}`).on('value', (snap) => {
         const userData = snap.val() || {};
         
@@ -180,7 +179,6 @@
         const rate = getInterestRate(globalCreditScore);
         document.getElementById('calc-rate').innerText = `${rate}%`;
 
-        // FIXED WEEKLY FORMULA: Final = Principal + (Principal * Rate * Weeks / 100)
         const addedInterest = (principal * rate * weeks) / 100;
         const totalPayable = principal + addedInterest;
 
@@ -225,8 +223,6 @@
         if (principal <= 0 || weeks <= 0) return alert("Enter a valid weekly/principal configuration.");
 
         const { rate, totalPayable } = runLoanCalculations();
-        
-        // TIME STRUCT: 1 Week = 7 Days
         const dueTimestamp = Date.now() + (weeks * 7 * 24 * 60 * 60 * 1000);
 
         let targetBalance = Math.round((globalBalance + principal) * 1000000) / 1000000;
@@ -257,6 +253,7 @@
 
     async function processLoanRepayment(loanKey, loanData) {
         const totalOwed = loanData.final_amount;
+        const principalAmount = loanData.principal || 0;
         if (globalBalance < totalOwed) return alert("Insufficient reserves to settle this liability.");
 
         const now = Date.now();
@@ -265,16 +262,17 @@
 
         let trackingScoreModification = 0;
 
-        // Score engine calculation relative to target deadlines
+        // FIXED LOGIC: Plus system rewards only apply if the loan amount was > 700
         if (varianceMs > 86400000) { 
-            trackingScoreModification = 5; // Early bonus (+2) + Base pay (+3)
+            trackingScoreModification = (principalAmount > 700) ? 5 : 0; 
         } else if (varianceMs >= 0) {
-            trackingScoreModification = 3; // Within the 24-hour bracket up to midnight (+3)
+            trackingScoreModification = (principalAmount > 700) ? 3 : 0; 
         } else {
+            // Minus system applies to ALL loans when late
             const overdueHours = Math.abs(varianceMs) / 3600000;
 
             if (overdueHours <= 24) {
-                trackingScoreModification = 0; // Grace block first day
+                trackingScoreModification = 0; 
             } else if (overdueHours <= 48) {
                 trackingScoreModification = -3;
             } else {
