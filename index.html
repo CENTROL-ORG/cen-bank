@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CEN Central Bank & Credit Registry</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <style>
+        body { background: #0a0a0a; color: #fff; font-family: 'Segoe UI', sans-serif; margin: 0; padding: 30px; display: flex; justify-content: center; }
+        .container { width: 100%; max-width: 950px; display: grid; grid-template-columns: 1fr 1fr; gap: 25px; }
+        .card { background: #111; border: 1px solid #222; padding: 25px; border-radius: 16px; box-sizing: border-box; }
+        .full-width { grid-column: span 2; }
+        
+        h2 { margin-top: 0; font-weight: 800; letter-spacing: -0.5px; font-size: 22px; border-bottom: 1px solid #222; padding-bottom: 10px; }
+        .accent-green { color: #00ff88; }
+        .accent-red { color: #ff0033; }
+        .accent-blue { color: #00e1ff; }
+
+        .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
+        .metric-box { background: #161616; padding: 15px; border-radius: 10px; border-left: 4px solid #222; }
+        .metric-box.bal { border-left-color: #00ff88; }
+        .metric-box.score { border-left-color: #00e1ff; }
+        .metric-label { font-size: 11px; color: #666; font-weight: bold; text-transform: uppercase; }
+        .metric-value { font-size: 24px; font-weight: bold; margin-top: 5px; font-family: monospace; }
+
+        .tab-bar { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 1px solid #222; padding-bottom: 10px; }
+        .tab-btn { background: #161616; border: 1px solid #222; color: #888; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 13px; transition: 0.2s; }
+        .tab-btn.active { background: #fff; color: #000; border-color: #fff; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        .form-group { margin-bottom: 15px; }
+        label { display: block; font-size: 11px; color: #888; font-weight: bold; margin-bottom: 5px; text-transform: uppercase; }
+        input, select { width: 100%; padding: 12px; background: #000; border: 1px solid #333; color: #fff; border-radius: 8px; box-sizing: border-box; font-size: 16px; outline: none; }
+        input:focus, select:focus { border-color: #00ff88; }
+        .calc-preview { background: #161616; padding: 12px; border-radius: 8px; font-size: 13px; margin: 15px 0; border: 1px dashed #333; }
+        .btn-action { width: 100%; background: #00ff88; color: #000; border: none; padding: 14px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 15px; }
+        .btn-action:hover { background: #00cc6e; }
+
+        .data-list { max-height: 400px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-right: 5px; }
+        .list-item { background: #161616; padding: 12px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; font-size: 13px; border: 1px solid #222; }
+        .item-details { display: flex; flex-direction: column; gap: 3px; }
+        .item-title { font-weight: bold; }
+        .item-sub { font-size: 11px; color: #666; }
+        .item-value { font-family: monospace; font-weight: bold; font-size: 15px; white-space: nowrap; }
+
+        .loan-card { background: #161616; padding: 15px; border-radius: 8px; border: 1px solid #222; margin-bottom: 10px; }
+        .loan-header { display: flex; justify-content: space-between; font-size: 12px; color: #888; font-weight: bold; margin-bottom: 10px; }
+        .loan-body { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 13px; margin-bottom: 12px; }
+        .btn-pay-loan { width: 100%; background: #00e1ff; color: #000; border: none; padding: 10px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 13px; }
+        .btn-pay-loan:hover { background: #00b8d4; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        
+        <div class="card full-width">
+            <h2 style="border:none; padding:0; margin-bottom:15px;">CEN CENTRAL REGISTRY Dashboard</h2>
+            <div class="metrics">
+                <div class="metric-box bal">
+                    <div class="metric-label">Total Liquid Capital</div>
+                    <div id="display-balance" class="metric-value accent-green">₹0.00</div>
+                </div>
+                <div class="metric-box score">
+                    <div class="metric-label">System Credit Score</div>
+                    <div id="display-score" class="metric-value accent-blue">550</div>
+                </div>
+            </div>
+            
+            <div class="tab-bar">
+                <button class="tab-btn active" onclick="switchTab('bank-tab', this)">🏛️ BANKING CORE</button>
+                <button class="tab-btn" onclick="switchTab('loan-tab', this)">📊 CREDIT & LOANS</button>
+            </div>
+        </div>
+
+        <!-- BANK CORE TAB -->
+        <div id="bank-tab" class="tab-content active full-width" style="display: grid; grid-template-columns: 1fr 1fr; gap: 25px;">
+            <div class="card">
+                <h2>Transaction System</h2>
+                <div class="form-group">
+                    <label>Action Type</label>
+                    <select id="tx-type">
+                        <option value="CREDIT">DEPOSIT (Credit Account)</option>
+                        <option value="DEBIT">WITHDRAWAL / TRANSFER (Debit Account)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Amount (INR)</label>
+                    <input type="number" id="tx-amount" placeholder="0.00" min="0.01" step="any">
+                </div>
+                <div class="form-group">
+                    <label>Description / Destination Target</label>
+                    <input type="text" id="tx-desc" placeholder="e.g., P2P Transfer to Wallet">
+                </div>
+                <button class="btn-action" onclick="executeTransaction()">PROCESS TRANSACTION</button>
+            </div>
+
+            <div class="card">
+                <h2>Account Statement Ledger</h2>
+                <div id="tx-history-log" class="data-list"></div>
+            </div>
+        </div>
+
+        <!-- LOAN CORE TAB -->
+        <div id="loan-tab" class="tab-content full-width" style="display: grid; grid-template-columns: 1fr 1fr; gap: 25px;">
+            <div class="card">
+                <h2>Request Credit Allocation</h2>
+                <div class="form-group">
+                    <label>Principal Amount Required</label>
+                    <input type="number" id="loan-amount" placeholder="0.00" min="1" oninput="runLoanCalculations()">
+                </div>
+                <div class="form-group">
+                    <label>Amortization Window (Months)</label>
+                    <input type="number" id="loan-months" value="1" min="1" max="120" oninput="runLoanCalculations()">
+                </div>
+                
+                <div class="calc-preview">
+                    <div><b>Dynamic Evaluation Metrics:</b></div>
+                    <div style="margin-top: 8px;">Assessed Interest Rate: <span id="calc-rate" class="accent-red">0%</span></div>
+                    <div>Estimated Calculation Profile: <span id="calc-formula">₹0.00</span></div>
+                </div>
+                
+                <button class="btn-action" style="background:#00e1ff;" onclick="submitLoanApplication()">AUTHORIZE LOAN FUNDING</button>
+            </div>
+
+            <div class="card">
+                <h2>Active Credit Matrix & Logs</h2>
+                <div id="loan-history-log" class="data-list"></div>
+            </div>
+        </div>
+
+    </div>
+
+<script>
+    // Configured directly with your default Asia Southeast Realtime Database URL
+    const firebaseConfig = { databaseURL: "https://centrol-bank-default-rtdb.asia-southeast1.firebasedatabase.app" };
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+    const userId = "pranshi_main";
+
+    let globalBalance = 0;
+    let globalCreditScore = 550;
+
+    // Synchronize global account layers instantaneously
+    db.ref(`users/${userId}`).on('value', (snap) => {
+        const userData = snap.val() || {};
+        
+        globalBalance = parseFloat(userData.balance) || 0;
+        
+        // CRITICAL FIX: Fallback to 550 if credit_score is missing in your current live database
+        globalCreditScore = userData.credit_score !== undefined ? parseInt(userData.credit_score) : 550;
+
+        document.getElementById('display-balance').innerText = `₹${globalBalance.toFixed(2)}`;
+        document.getElementById('display-score').innerText = globalCreditScore;
+
+        renderLedgers(userData.history, userData.loans);
+        runLoanCalculations();
+    });
+
+    function switchTab(tabId, element) {
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById(tabId).classList.add('active');
+        element.classList.add('active');
+    }
+
+    function getInterestRate(score) {
+        if (score >= 300 && score < 400) return 50;
+        if (score >= 400 && score < 500) return 30;
+        if (score >= 500 && score < 600) return 22;
+        if (score >= 600 && score < 700) return 18;
+        if (score >= 700 && score < 800) return 10;
+        if (score >= 800 && score <= 900) return 7;
+        return 50; 
+    }
+
+    function runLoanCalculations() {
+        const principal = parseFloat(document.getElementById('loan-amount').value) || 0;
+        const months = parseInt(document.getElementById('loan-months').value) || 0;
+        
+        const rate = getInterestRate(globalCreditScore);
+        document.getElementById('calc-rate').innerText = `${rate}%`;
+
+        const weeks = months * 4.34524; 
+        const addedInterest = (principal * rate * weeks) / 100;
+        const totalPayable = principal + addedInterest;
+
+        document.getElementById('calc-formula').innerText = `₹${totalPayable.toFixed(2)} (Interest: ₹${addedInterest.toFixed(2)})`;
+        return { rate, totalPayable };
+    }
+
+    async function executeTransaction() {
+        const type = document.getElementById('tx-type').value;
+        const amount = parseFloat(document.getElementById('tx-amount').value) || 0;
+        const desc = document.getElementById('tx-desc').value || "Manual Transaction Engine Adjustment";
+
+        if (amount <= 0) return alert("Enter a valid numeric configuration amount.");
+        
+        let targetBalance = globalBalance;
+        if (type === "CREDIT") {
+            targetBalance += amount;
+        } else {
+            if (amount > globalBalance) return alert("Insufficient Liquid Reserves present inside target system layer.");
+            targetBalance -= amount;
+        }
+
+        // CRITICAL FIX: Safe float rounding before pushing to DB
+        targetBalance = Math.round(targetBalance * 1000000) / 1000000;
+
+        const userRef = db.ref(`users/${userId}`);
+        await userRef.child('balance').set(targetBalance);
+        await userRef.child('history').push({
+            amount: type === "CREDIT" ? amount : -amount,
+            description: desc.toUpperCase(),
+            timestamp: new Date().toLocaleString(),
+            type: type
+        });
+
+        document.getElementById('tx-amount').value = "";
+        document.getElementById('tx-desc').value = "";
+    }
+
+    async function submitLoanApplication() {
+        const principal = parseFloat(document.getElementById('loan-amount').value) || 0;
+        const months = parseInt(document.getElementById('loan-months').value) || 0;
+
+        if (principal <= 0 || months <= 0) return alert("Construct a structurally sound Principal/Month payload.");
+
+        const { rate, totalPayable } = runLoanCalculations();
+        const dueTimestamp = Date.now() + (months * 30 * 24 * 60 * 60 * 1000);
+
+        let targetBalance = Math.round((globalBalance + principal) * 1000000) / 1000000;
+        const userRef = db.ref(`users/${userId}`);
+        
+        await userRef.child('balance').set(targetBalance);
+        
+        // This syncs smoothly with your live logs
+        await userRef.child('history').push({
+            amount: principal,
+            description: `LOAN DISBURSEMENT GRANTED (${rate}% INT)`,
+            timestamp: new Date().toLocaleString(),
+            type: "CREDIT"
+        });
+
+        await userRef.child('loans').push({
+            principal: principal,
+            months: months,
+            interest_rate: rate,
+            final_amount: Math.round(totalPayable * 100) / 100,
+            status: "ACTIVE",
+            due_timestamp: dueTimestamp,
+            timestamp: new Date().toLocaleString()
+        });
+
+        document.getElementById('loan-amount').value = "";
+        alert("Loan Granted! Funds successfully mixed with your balance.");
+    }
+
+    async function processLoanRepayment(loanKey, loanData) {
+        const totalOwed = loanData.final_amount;
+        if (globalBalance < totalOwed) return alert("Liquid Account Reserves insufficient to pay off total structural balance liability.");
+
+        const now = Date.now();
+        const dueTime = loanData.due_timestamp;
+        const varianceMs = dueTime - now;
+
+        let trackingScoreModification = 0;
+
+        // Dynamic credit scoring engine logic
+        if (varianceMs > 86400000) { 
+            trackingScoreModification = 5; 
+        } else if (varianceMs >= 0) {
+            trackingScoreModification = 3; 
+        } else {
+            const overdueHours = Math.abs(varianceMs) / 3600000;
+
+            if (overdueHours <= 24) {
+                trackingScoreModification = 0; 
+            } else if (overdueHours <= 48) {
+                trackingScoreModification = -3;
+            } else {
+                const structuredDaysPastGrace = Math.ceil((overdueHours - 24) / 24);
+                trackingScoreModification = -(structuredDaysPastGrace * 3);
+            }
+        }
+
+        let theoreticalScore = globalCreditScore + trackingScoreModification;
+        if (theoreticalScore < 300) theoreticalScore = 300;
+        if (theoreticalScore > 900) theoreticalScore = 900;
+
+        let targetBalance = Math.round((globalBalance - totalOwed) * 1000000) / 1000000;
+        const userRef = db.ref(`users/${userId}`);
+        
+        await userRef.child('balance').set(targetBalance);
+        await userRef.child('credit_score').set(theoreticalScore);
+        await userRef.child(`loans/${loanKey}/status`).set("PAID");
+        
+        await userRef.child('history').push({
+            amount: -totalOwed,
+            description: `REPAYMENT: LOAN SYSTEM AUDIT PARENT (SCORE: ${trackingScoreModification >= 0 ? '+' : ''}${trackingScoreModification})`,
+            timestamp: new Date().toLocaleString(),
+            type: "DEBIT"
+        });
+
+        alert(`Loan Settled! Credit Score Adjusted: ${trackingScoreModification >= 0 ? '+' : ''}${trackingScoreModification} Points.`);
+    }
+
+    function renderLedgers(historyObj, loansObj) {
+        const txLog = document.getElementById('tx-history-log');
+        txLog.innerHTML = "";
+        if (historyObj) {
+            Object.values(historyObj).reverse().forEach(tx => {
+                const isCredit = tx.type === "CREDIT";
+                txLog.innerHTML += `
+                    <div class="list-item">
+                        <div class="item-details">
+                            <span class="item-title">${tx.description}</span>
+                            <span class="item-sub">${tx.timestamp}</span>
+                        </div>
+                        <span class="item-value ${isCredit ? 'accent-green' : 'accent-red'}">
+                            ${isCredit ? '+' : ''}₹${Math.abs(tx.amount).toFixed(2)}
+                        </span>
+                    </div>
+                `;
+            });
+        } else {
+            txLog.innerHTML = `<div style="text-align:center; color:#444; font-size:12px; padding:20px;">No account data traces visible.</div>`;
+        }
+
+        const loanLog = document.getElementById('loan-history-log');
+        loanLog.innerHTML = "";
+        if (loansObj) {
+            Object.entries(loansObj).reverse().forEach(([key, loan]) => {
+                const isActive = loan.status === "ACTIVE";
+                const isOverdue = Date.now() > loan.due_timestamp && isActive;
+                
+                loanLog.innerHTML += `
+                    <div class="loan-card" style="border-color: ${!isActive ? '#222' : isOverdue ? '#ff0033' : '#00e1ff'}">
+                        <div class="loan-header">
+                            <span>REGISTRY RECONCILIATION ID: ...${key.slice(-6).toUpperCase()}</span>
+                            <span class="${isActive ? (isOverdue ? 'accent-red' : 'accent-blue') : 'accent-green'}">${loan.status}</span>
+                        </div>
+                        <div class="loan-body">
+                            <div>Principal Base: <b>₹${loan.principal.toFixed(2)}</b></div>
+                            <div>Term Matrix: <b>${loan.months} Months</b></div>
+                            <div>Tier Rate: <b>${loan.interest_rate}%</b></div>
+                            <div>Liability Cap: <b class="accent-red">₹${loan.final_amount.toFixed(2)}</b></div>
+                            <div style="grid-column: span 2; font-size:11px; margin-top:5px; color:#666;">
+                                Target Maturity Lock: ${new Date(loan.due_timestamp).toLocaleString()}
+                            </div>
+                        </div>
+                        ${isActive ? `<button class="btn-pay-loan" onclick='processLoanRepayment("${key}", ${JSON.stringify(loan)})'>REDEEM LIABILITY BALANCE</button>` : ''}
+                    </div>
+                `;
+            });
+        } else {
+            loanLog.innerHTML = `<div style="text-align:center; color:#444; font-size:12px; padding:20px;">No active profiles matched inside log index.</div>`;
+        }
+    }
+</script>
+</body>
+</html>
